@@ -1,24 +1,20 @@
-// models/db.js
-require('dotenv').config();
 const { MongoClient } = require('mongodb');
 
-const url = process.env.MONGO_URL;
-const dbName = process.env.MONGO_DB;
-let dbInstance = null;
-
 async function connectToDatabase() {
-    if (dbInstance) return dbInstance;
+  if (!process.env.MONGO_URI) {
+    throw new Error('MONGO_URI is not defined in .env');
+  }
+  if (!process.env.MONGO_DB) {
+    throw new Error('MONGO_DB is not defined in .env');
+  }
 
-    const client = new MongoClient(url);  
+  const client = new MongoClient(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
 
-    // Task 2: Connect to MongoDB
-    await client.connect();
-
-    // Task 3: Connect to the secondChance database
-    dbInstance = client.db(dbName);
-
-    // Task 4: Return database instance
-    return dbInstance;
+  await client.connect();
+  return client.db(process.env.MONGO_DB);
 }
 
-module.exports = connectToDatabase;
+module.exports = { connectToDatabase };

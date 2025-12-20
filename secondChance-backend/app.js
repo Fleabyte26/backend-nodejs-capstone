@@ -6,10 +6,11 @@ const cors = require('cors');
 const pinoHttp = require('pino-http');
 
 const logger = require('./logger');
-const connectToDatabase = require('./models/db');
+const { connectToDatabase } = require('./models/db'); // MongoDB connection
 
 // Routes
 const secondChanceItemsRoutes = require('./routes/secondChanceItemsRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 const app = express();
 const port = 3060;
@@ -22,11 +23,14 @@ app.use(express.json());
 app.use(pinoHttp({ logger }));
 
 // ============================
-// Connect to MongoDB (once)
+// MongoDB Connection
 // ============================
+let db; // store DB connection
+
 connectToDatabase()
-  .then(() => {
-    logger.info('Connected to DB');
+  .then((database) => {
+    db = database;
+    logger.info('Connected to MongoDB');
   })
   .catch((err) => {
     console.error('Failed to connect to DB', err);
@@ -36,12 +40,21 @@ connectToDatabase()
 // ============================
 // Routes
 // ============================
-
 app.get('/', (req, res) => {
   res.send('Inside the server');
 });
 
-app.use('/api/secondchance/items', secondChanceItemsRoutes);
+// Pass DB to secondChanceItemsRoutes
+app.use('/api/secondchance/items', (req, res, next) => {
+  req.db = db;
+  next();
+}, secondChanceItemsRoutes);
+
+// Pass DB to searchRoutes
+app.use('/api/secondchance/search', (req, res, next) => {
+  req.db = db;
+  next();
+}, searchRoutes);
 
 // ============================
 // Global Error Handler
