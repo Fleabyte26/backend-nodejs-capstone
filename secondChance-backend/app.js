@@ -11,9 +11,10 @@ const { connectToDatabase } = require('./models/db'); // MongoDB connection
 // Routes
 const secondChanceItemsRoutes = require('./routes/secondChanceItemsRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const sentimentRoutes = require('./routes/sentimentRoutes'); // ✅ Sentiment
 
 const app = express();
-const port = 3060;
+const port = process.env.PORT || 3060;
 
 // ============================
 // Middleware
@@ -25,7 +26,7 @@ app.use(pinoHttp({ logger }));
 // ============================
 // MongoDB Connection
 // ============================
-let db; // store DB connection
+let db; // store DB connection (optional)
 
 connectToDatabase()
   .then((database) => {
@@ -33,8 +34,8 @@ connectToDatabase()
     logger.info('Connected to MongoDB');
   })
   .catch((err) => {
-    console.error('Failed to connect to DB', err);
-    process.exit(1);
+    // ✅ DO NOT KILL SERVER — sentiment does not need DB
+    logger.error('Failed to connect to MongoDB. Continuing without DB.');
   });
 
 // ============================
@@ -44,17 +45,34 @@ app.get('/', (req, res) => {
   res.send('Inside the server');
 });
 
-// Pass DB to secondChanceItemsRoutes
-app.use('/api/secondchance/items', (req, res, next) => {
-  req.db = db;
-  next();
-}, secondChanceItemsRoutes);
+// Items routes (require DB)
+app.use(
+  '/api/secondchance/items',
+  (req, res, next) => {
+    if (!db) {
+      return res.status(503).json({ message: 'Database unavailable' });
+    }
+    req.db = db;
+    next();
+  },
+  secondChanceItemsRoutes
+);
 
-// Pass DB to searchRoutes
-app.use('/api/secondchance/search', (req, res, next) => {
-  req.db = db;
-  next();
-}, searchRoutes);
+// Search routes (require DB)
+app.use(
+  '/api/secondchance/search',
+  (req, res, next) => {
+    if (!db) {
+      return res.status(503).json({ message: 'Database unavailable' });
+    }
+    req.db = db;
+    next();
+  },
+  searchRoutes
+);
+
+// ✅ Sentiment Analysis Route (NO DB REQUIRED)
+app.use('/api/secondchance/sentiment', sentimentRoutes);
 
 // ============================
 // Global Error Handler
