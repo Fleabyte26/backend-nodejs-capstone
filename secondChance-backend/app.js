@@ -11,7 +11,8 @@ const { connectToDatabase } = require('./models/db'); // MongoDB connection
 // Routes
 const secondChanceItemsRoutes = require('./routes/secondChanceItemsRoutes');
 const searchRoutes = require('./routes/searchRoutes');
-const sentimentRoutes = require('./routes/sentimentRoutes'); // ✅ Sentiment
+const sentimentRoutes = require('./routes/sentimentRoutes');
+const authRoutes = require('./routes/authRoutes'); // ✅ AUTH routes
 
 const app = express();
 const port = process.env.PORT || 3060;
@@ -34,7 +35,7 @@ connectToDatabase()
     logger.info('Connected to MongoDB');
   })
   .catch((err) => {
-    // ✅ DO NOT KILL SERVER — sentiment does not need DB
+    // Do NOT kill server — sentiment & auth can still work
     logger.error('Failed to connect to MongoDB. Continuing without DB.');
   });
 
@@ -71,7 +72,20 @@ app.use(
   searchRoutes
 );
 
-// ✅ Sentiment Analysis Route (NO DB REQUIRED)
+// Auth routes (require DB)
+app.use(
+  '/api/auth',
+  (req, res, next) => {
+    if (!db) {
+      return res.status(503).json({ message: 'Database unavailable' });
+    }
+    req.db = db;
+    next();
+  },
+  authRoutes
+);
+
+// Sentiment routes (NO DB REQUIRED)
 app.use('/api/secondchance/sentiment', sentimentRoutes);
 
 // ============================
