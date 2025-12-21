@@ -15,7 +15,7 @@ const sentimentRoutes = require('./routes/sentimentRoutes');
 const authRoutes = require('./routes/authRoutes'); // ✅ AUTH routes
 
 const app = express();
-const port = process.env.PORT || 3060;
+const PORT = process.env.PORT || 3060;
 
 // ============================
 // Middleware
@@ -99,6 +99,6 @@ app.use((err, req, res, next) => {
 // ============================
 // Start Server
 // ============================
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
 });

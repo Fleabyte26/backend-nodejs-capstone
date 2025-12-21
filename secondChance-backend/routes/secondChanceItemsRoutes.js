@@ -1,124 +1,97 @@
+/* jshint esversion: 8 */
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const router = express.Router();
-
-const connectToDatabase = require('../models/db');
-const logger = require('../logger');
-
-// ============================
-// File upload setup
-// ============================
-
-const directoryPath = 'public/images';
-
-// Ensure upload directory exists
-if (!fs.existsSync(directoryPath)) {
-  fs.mkdirSync(directoryPath, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, directoryPath);
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  }
-});
-
-const upload = multer({ storage });
+const logger = require('../logger'); // ensure you have your logger
+const { connectToDatabase } = require('../models/db'); // MongoDB connection
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 // ============================
-// GET all secondChanceItems (Step 2)
+// GET all secondChanceItems
 // ============================
 router.get('/', async (req, res, next) => {
-  logger.info('/ called');
   try {
-    const db = await connectToDatabase();                         // Task 1
-    const collection = db.collection('secondChanceItems');       // Task 2
-    const secondChanceItems = await collection.find({}).toArray(); // Task 3
-    res.json(secondChanceItems);                                  // Task 4
-  } catch (e) {
-    next(e);
+    const db = req.db || await connectToDatabase(); // use req.db if available
+    const collectionName = process.env.MONGO_COLLECTION || 'secondChanceItems';
+    const dbName = process.env.MONGO_DB || 'secondChance';
+
+    const items = await db.db(dbName).collection(collectionName).find({}).toArray();
+
+    res.json(items);
+  } catch (err) {
+    console.error('Mongo fetch error:', err);
+    logger.error('Mongo fetch error:', err);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
 // ============================
-// POST add new secondChanceItem (Step 3)
+// POST add new secondChanceItem
 // ============================
 router.post('/', upload.single('file'), async (req, res, next) => {
   try {
-    const db = await connectToDatabase();                   // Task 1
-    const collection = db.collection('secondChanceItems'); // Task 2
+    const db = await connectToDatabase();
+    const collection = db.collection('secondChanceItems');
 
-    let secondChanceItem = req.body;                        // Task 3
+    let secondChanceItem = req.body;
 
-    // Task 4: get last id and increment
-    const lastItemQuery = await collection
-      .find()
-      .sort({ id: -1 })
-      .limit(1);
-
+    const lastItemQuery = await collection.find().sort({ id: -1 }).limit(1);
     await lastItemQuery.forEach(item => {
       secondChanceItem.id = (parseInt(item.id) + 1).toString();
     });
 
-    // Task 5: set date_added
-    const date_added = Math.floor(new Date().getTime() / 1000);
-    secondChanceItem.date_added = date_added;
+    secondChanceItem.date_added = Math.floor(new Date().getTime() / 1000);
 
-    // Task 7: image upload
     if (req.file) {
       secondChanceItem.image = `/images/${req.file.originalname}`;
     }
 
-    // Task 6: insert into DB
     await collection.insertOne(secondChanceItem);
 
     res.status(201).json(secondChanceItem);
   } catch (e) {
+    console.error('POST error:', e);
     next(e);
   }
 });
 
 // ============================
-// GET secondChanceItem by ID (Step 4)
+// GET secondChanceItem by ID
 // ============================
 router.get('/:id', async (req, res, next) => {
   try {
-    const db = await connectToDatabase();                   // Task 1
-    const collection = db.collection('secondChanceItems'); // Task 2
+    const db = await connectToDatabase();
+    const collection = db.collection('secondChanceItems');
 
     const id = req.params.id;
-    const secondChanceItem = await collection.findOne({ id }); // Task 3
+    const secondChanceItem = await collection.findOne({ id });
 
-    if (!secondChanceItem) {                                // Task 4
+    if (!secondChanceItem) {
       return res.status(404).send('secondChanceItem not found');
     }
 
     res.json(secondChanceItem);
   } catch (e) {
+    console.error('GET by ID error:', e);
     next(e);
   }
 });
 
 // ============================
-// PUT update secondChanceItem (Step 5)
+// PUT update secondChanceItem
 // ============================
 router.put('/:id', async (req, res, next) => {
   try {
-    const db = await connectToDatabase();                   // Task 1
-    const collection = db.collection('secondChanceItems'); // Task 2
+    const db = await connectToDatabase();
+    const collection = db.collection('secondChanceItems');
     const id = req.params.id;
 
-    const secondChanceItem = await collection.findOne({ id }); // Task 3
+    const secondChanceItem = await collection.findOne({ id });
     if (!secondChanceItem) {
       logger.error('secondChanceItem not found');
       return res.status(404).json({ error: 'secondChanceItem not found' });
     }
 
-    // Task 4: update fields
     secondChanceItem.category = req.body.category;
     secondChanceItem.condition = req.body.condition;
     secondChanceItem.age_days = req.body.age_days;
@@ -132,35 +105,36 @@ router.put('/:id', async (req, res, next) => {
       { returnDocument: 'after' }
     );
 
-    // Task 5: confirmation
     if (updateSecondChanceItem) {
       res.json({ uploaded: 'success' });
     } else {
       res.json({ uploaded: 'failed' });
     }
   } catch (e) {
+    console.error('PUT error:', e);
     next(e);
   }
 });
 
 // ============================
-// DELETE secondChanceItem (Step 6)
+// DELETE secondChanceItem
 // ============================
 router.delete('/:id', async (req, res, next) => {
   try {
-    const db = await connectToDatabase();                   // Task 1
-    const collection = db.collection('secondChanceItems'); // Task 2
+    const db = await connectToDatabase();
+    const collection = db.collection('secondChanceItems');
     const id = req.params.id;
 
-    const secondChanceItem = await collection.findOne({ id }); // Task 3
+    const secondChanceItem = await collection.findOne({ id });
     if (!secondChanceItem) {
       logger.error('secondChanceItem not found');
       return res.status(404).json({ error: 'secondChanceItem not found' });
     }
 
-    await collection.deleteOne({ id });                     // Task 4
+    await collection.deleteOne({ id });
     res.json({ deleted: 'success' });
   } catch (e) {
+    console.error('DELETE error:', e);
     next(e);
   }
 });
