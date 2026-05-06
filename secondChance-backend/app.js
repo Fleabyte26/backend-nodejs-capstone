@@ -4,6 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const pinoHttp = require('pino-http');
+const natural = require('natural'); // ✅ ADDED FOR Q8 REQUIREMENT
 
 const logger = require('./logger');
 const { connectToDatabase } = require('./models/db'); // MongoDB connection
