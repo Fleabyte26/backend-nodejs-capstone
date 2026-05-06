@@ -4,7 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const pinoHttp = require('pino-http');
-const natural = require('natural'); // ✅ ADDED FOR Q8 REQUIREMENT
+const natural = require('natural'); // NLP requirement (Q8)
 
 const logger = require('./logger');
 const { connectToDatabase } = require('./models/db'); // MongoDB connection
@@ -13,7 +13,7 @@ const { connectToDatabase } = require('./models/db'); // MongoDB connection
 const secondChanceItemsRoutes = require('./routes/secondChanceItemsRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const sentimentRoutes = require('./routes/sentimentRoutes');
-const authRoutes = require('./routes/authRoutes'); // ✅ AUTH routes
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3060;
@@ -26,18 +26,27 @@ app.use(express.json());
 app.use(pinoHttp({ logger }));
 
 // ============================
-// MongoDB Connection
+// MongoDB Connection (FIXED FLOW)
 // ============================
-let db; // store DB connection (optional)
+let db;
 
+// IMPORTANT FIX:
+// Start server ONLY after DB connection is successful
 connectToDatabase()
   .then((database) => {
     db = database;
     logger.info('Connected to MongoDB');
+
+    // ============================
+    // Start Server ONLY after DB is ready
+    // ============================
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   })
   .catch((err) => {
-    // Do NOT kill server — sentiment & auth can still work
-    logger.error('Failed to connect to MongoDB. Continuing without DB.');
+    logger.error('Failed to connect to MongoDB:', err);
+    process.exit(1); // prevent unstable partial server
   });
 
 // ============================
@@ -95,11 +104,4 @@ app.use('/api/secondchance/sentiment', sentimentRoutes);
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ message: 'Internal Server Error' });
-});
-
-// ============================
-// Start Server
-// ============================
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
 });
